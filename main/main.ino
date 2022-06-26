@@ -27,6 +27,7 @@ void loop() {
   uint8_t bitCount = 0;
   uint8_t dataIn = 0;
   uint32_t dataOut = 0;
+  uint32_t n64_buttons = 0;
 
   BP32.update();
   if (myGamepad && myGamepad->isConnected()) {
@@ -36,20 +37,51 @@ void loop() {
     int yAxis = myGamepad->axisY();
 
     if(buttons | BUTTON_A)
-      dataOut++;
-    dataOut << 1;
+      n64_buttons++;
+    n64_buttons << 1;
     if(buttons | BUTTON_B)
-      dataOut++;
-    dataOut << 1;
+      n64_buttons++;
+    n64_buttons << 1;
     if(buttons | BUTTON_Z)
-      dataOut++;
-    dataOut << 1;
+      n64_buttons++;
+    n64_buttons << 1;
     if(buttons | BUTTON_START)
-      dataOut++;
-    dataOut << 1;
-  }
+      n64_buttons++;
+    n64_buttons << 1;
+    if(dpad | DPAD_UP)
+      n64_buttons++;
+    n64_buttons << 1;
+    if(dpad | DPAD_DOWN)
+      n64_buttons++;
+    n64_buttons << 1;
+    if(dpad | DPAD_LEFT)
+      n64_buttons++;
+    n64_buttons << 1;
+    if(dpad | DPAD_RIGHT)
+      n64_buttons++;
+    n64_buttons << 3; // 2 unused bits
+    if(buttons | BUTTON_L)
+      n64_buttons++;
+    n64_buttons << 1;
+    if(buttons | BUTTON_R)
+      n64_buttons++;
+    n64_buttons << 1;
+    if(buttons | BUTTON_C_UP)
+      n64_buttons++;
+    n64_buttons << 1;
+    if(buttons | BUTTON_C_DOWN)
+      n64_buttons++;
+    n64_buttons << 1;
+    if(buttons | BUTTON_C_LEFT)
+      n64_buttons++;
+    n64_buttons << 1;
+    if(buttons | BUTTON_C_RIGHT)
+      n64_buttons++;
+    n64_buttons << 1;
 
-  
+    // analog sticks - skip for now
+    n64_buttons << 15;
+  }
   
   noInterrupts();
   pinMode(N64_BUS_PIN, INPUT);
@@ -72,21 +104,45 @@ void loop() {
       while(!digitalRead(N64_BUS_PIN));
       while(digitalRead(N64_BUS_PIN));
     }
+    delay2us(); // wait for stop bit
+    delay1us();
     if(dataIn == 0x00 || dataIn == 0xff) {
       dataOut = CONTROLLER_ID;
       bitCount = 16;
     } else if(dataIn == 0x01) {
-      goto end;
+      dataOut = n64_buttons;
+      bitCount = 32;
     } else {
       goto end;
     }
     goto write_data;
 
   write_data:
-
+    pinMode(N64_BUS_PIN, OUTPUT);
+    while(bitCount--) {
+      digitalWrite(N64_BUS_PIN, LOW);
+      delay1us();
+      if(dataOut | 0x80000000)
+        digitalWrite(N64_BUS_PIN, HIGH);
+      else
+        digitalWrite(N64_BUS_PIN, LOW);
+      delay2us();
+      digitalWrite(N64_BUS_PIN, HIGH);
+      delay1us();
+      dataOut << 1;
+    }
+    // stop bit
+    digitalWrite(N64_BUS_PIN, LOW);
+    delay2us();
+    digitalWrite(N64_BUS_PIN, HIGH);
+    delay2us();
+    goto end;
 
 
   end:
+    pinMode(N64_BUS_PIN, INPUT);
+
+  
   interrupts();
   
 
