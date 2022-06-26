@@ -21,3 +21,6 @@
 #define DPAD_LEFT 0x08
 #define DPAD_RIGHT 0x04
 #define DPAD_DOWN 0x02
+
+#define delayHalf() asm("nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;");
+#define delay1us() delayHalf() delayHalf()
