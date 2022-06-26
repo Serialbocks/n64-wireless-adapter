@@ -15,8 +15,6 @@ void setup() {
   BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
 
   BP32.forgetBluetoothKeys();
-
-  noInterrupts();
 }
 
 void onConnectedGamepad(GamepadPtr gp) {
@@ -47,11 +45,20 @@ void onDisconnectedGamepad(GamepadPtr gp) {
 
 void loop() {
   
-  
+  noInterrupts();
+  digitalWrite(2, HIGH);
+  delayHalf();
+  digitalWrite(2, LOW);
+  delay2us();
   digitalWrite(2, HIGH);
   delay1us();
   digitalWrite(2, LOW);
-  delay1us();
+  delay2us();
+  digitalWrite(2, HIGH);
+  delay2us();
+  digitalWrite(2, LOW);
+  delay2us();
+  interrupts();
 
   /*for (int i = 0; i < MAX_CONTROLLER_CONNECTIONS; i++) {
     GamepadPtr myGamepad = myGamepads[i];
