@@ -3,15 +3,13 @@
 #include <Bluepad32.h>
 #include "mappings.h"
 
-#define MAX_CONTROLLER_CONNECTIONS 1
+#define N64_BUS_PIN 2
 
 GamepadPtr myGamepad = nullptr;
 
 void setup() {
-  pinMode(2, OUTPUT);
-
+  pinMode(N64_BUS_PIN, INPUT);
   BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
-
   BP32.forgetBluetoothKeys();
 }
 
@@ -26,6 +24,10 @@ void onDisconnectedGamepad(GamepadPtr gp) {
 }
 
 void loop() {
+  uint8_t bitCount = 0;
+  uint8_t dataIn = 0;
+  uint32_t dataOut = 0;
+
   BP32.update();
   if (myGamepad && myGamepad->isConnected()) {
     uint8_t dpad = myGamepad->dpad();
@@ -35,18 +37,41 @@ void loop() {
   }
   
   noInterrupts();
-  digitalWrite(2, HIGH);
-  delayHalf();
-  digitalWrite(2, LOW);
-  delay2us();
-  digitalWrite(2, HIGH);
-  delay1us();
-  digitalWrite(2, LOW);
-  delay2us();
-  digitalWrite(2, HIGH);
-  delay2us();
-  digitalWrite(2, LOW);
-  delay2us();
+  pinMode(N64_BUS_PIN, INPUT);
+  
+  console_off:
+    while(!digitalRead(N64_BUS_PIN));
+    goto idle;
+
+  idle:
+    while(digitalRead(N64_BUS_PIN));
+    goto read_console_command;
+
+  read_console_command:
+    bitCount = 8;
+    dataIn = 0;
+    while(bitCount--) {
+      delay2us();
+      dataIn += digitalRead(N64_BUS_PIN);
+      dataIn << 1;
+      while(!digitalRead(N64_BUS_PIN));
+      while(digitalRead(N64_BUS_PIN));
+    }
+    if(dataIn == 0x00 || dataIn == 0xff) {
+      dataOut = CONTROLLER_ID;
+      bitCount = 16;
+    } else if(dataIn == 0x01) {
+      goto end;
+    } else {
+      goto end;
+    }
+    goto write_data;
+
+  write_data:
+
+
+
+  end:
   interrupts();
   
 
