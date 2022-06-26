@@ -34,7 +34,22 @@ void loop() {
     uint16_t buttons = myGamepad->buttons();
     int xAxis = myGamepad->axisX();
     int yAxis = myGamepad->axisY();
+
+    if(buttons | BUTTON_A)
+      dataOut++;
+    dataOut << 1;
+    if(buttons | BUTTON_B)
+      dataOut++;
+    dataOut << 1;
+    if(buttons | BUTTON_Z)
+      dataOut++;
+    dataOut << 1;
+    if(buttons | BUTTON_START)
+      dataOut++;
+    dataOut << 1;
   }
+
+  
   
   noInterrupts();
   pinMode(N64_BUS_PIN, INPUT);
