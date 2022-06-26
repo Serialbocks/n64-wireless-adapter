@@ -5,9 +5,7 @@
 
 #define MAX_CONTROLLER_CONNECTIONS 1
 
-
-
-GamepadPtr myGamepads[MAX_CONTROLLER_CONNECTIONS] = {};
+GamepadPtr myGamepad = nullptr;
 
 void setup() {
   pinMode(2, OUTPUT);
@@ -18,32 +16,23 @@ void setup() {
 }
 
 void onConnectedGamepad(GamepadPtr gp) {
-  bool foundSlot = false;
-  for (int i = 0; i < MAX_CONTROLLER_CONNECTIONS; i++) {
-    if (myGamepads[i] == nullptr) {
-      myGamepads[i] = gp;
-      foundSlot = true;
-      break;
-    }
-  }
-
-  if(foundSlot) {
-    BP32.enableNewBluetoothConnections(false);
-  }
+  myGamepad = gp;
+  BP32.enableNewBluetoothConnections(false);
 }
 
 void onDisconnectedGamepad(GamepadPtr gp) {
-  for (int i = 0; i < MAX_CONTROLLER_CONNECTIONS; i++) {
-    if (myGamepads[i] == gp) {
-      myGamepads[i] = nullptr;
-      break;
-    }
-  }
-
+  myGamepad = nullptr;
   BP32.enableNewBluetoothConnections(true);
 }
 
 void loop() {
+  BP32.update();
+  if (myGamepad && myGamepad->isConnected()) {
+    uint8_t dpad = myGamepad->dpad();
+    uint16_t buttons = myGamepad->buttons();
+    int xAxis = myGamepad->axisX();
+    int yAxis = myGamepad->axisY();
+  }
   
   noInterrupts();
   digitalWrite(2, HIGH);
@@ -59,16 +48,6 @@ void loop() {
   digitalWrite(2, LOW);
   delay2us();
   interrupts();
+  
 
-  /*for (int i = 0; i < MAX_CONTROLLER_CONNECTIONS; i++) {
-    GamepadPtr myGamepad = myGamepads[i];
-
-    if (myGamepad && myGamepad->isConnected()) {
-
-      uint8_t dpad = myGamepad->dpad();
-      uint16_t buttons = myGamepad->buttons();
-      int xAxis = myGamepad->axisX();
-      int yAxis = myGamepad->axisY();
-    }
-  }*/
 }
