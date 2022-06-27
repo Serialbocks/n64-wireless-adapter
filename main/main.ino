@@ -3,12 +3,14 @@
 #include <Bluepad32.h>
 #include "mappings.h"
 
-#define N64_BUS_PIN 2
+#define N64_BUS_PIN 25
+#define TEST_PIN 15
+#define set_output(pin) (gpio_set_dir_out_masked(1U << pin))
+#define set_input(pin) (gpio_set_dir_in_masked(1U << pin))
 
 GamepadPtr myGamepad = nullptr;
 
 void setup() {
-  pinMode(N64_BUS_PIN, INPUT);
   BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
   BP32.forgetBluetoothKeys();
 }
@@ -29,6 +31,15 @@ void loop() {
   uint32_t dataOut = 0;
   uint32_t n64_buttons = 0;
 
+
+  //pinMode(3, OUTPUT);
+  //while(true) {
+  //  gpio_put(TEST_PIN, 1);
+  //  delay1us();
+  //  gpio_put(TEST_PIN, 0);
+  //  delay1us();
+  //}
+
   BP32.update();
   if (myGamepad && myGamepad->isConnected()) {
     uint8_t dpad = myGamepad->dpad();
@@ -38,71 +49,75 @@ void loop() {
 
     if(buttons | BUTTON_A)
       n64_buttons++;
-    n64_buttons << 1;
+    n64_buttons = n64_buttons << 1;
     if(buttons | BUTTON_B)
       n64_buttons++;
-    n64_buttons << 1;
+    n64_buttons = n64_buttons << 1;
     if(buttons | BUTTON_Z)
       n64_buttons++;
-    n64_buttons << 1;
+    n64_buttons = n64_buttons << 1;
     if(buttons | BUTTON_START)
       n64_buttons++;
-    n64_buttons << 1;
+    n64_buttons = n64_buttons << 1;
     if(dpad | DPAD_UP)
       n64_buttons++;
-    n64_buttons << 1;
+    n64_buttons = n64_buttons << 1;
     if(dpad | DPAD_DOWN)
       n64_buttons++;
-    n64_buttons << 1;
+    n64_buttons = n64_buttons << 1;
     if(dpad | DPAD_LEFT)
       n64_buttons++;
-    n64_buttons << 1;
+    n64_buttons = n64_buttons << 1;
     if(dpad | DPAD_RIGHT)
       n64_buttons++;
     n64_buttons << 3; // 2 unused bits
     if(buttons | BUTTON_L)
       n64_buttons++;
-    n64_buttons << 1;
+    n64_buttons = n64_buttons << 1;
     if(buttons | BUTTON_R)
       n64_buttons++;
-    n64_buttons << 1;
+    n64_buttons = n64_buttons << 1;
     if(buttons | BUTTON_C_UP)
       n64_buttons++;
-    n64_buttons << 1;
+    n64_buttons = n64_buttons << 1;
     if(buttons | BUTTON_C_DOWN)
       n64_buttons++;
-    n64_buttons << 1;
+    n64_buttons = n64_buttons << 1;
     if(buttons | BUTTON_C_LEFT)
       n64_buttons++;
-    n64_buttons << 1;
+    n64_buttons = n64_buttons << 1;
     if(buttons | BUTTON_C_RIGHT)
       n64_buttons++;
-    n64_buttons << 1;
+    n64_buttons = n64_buttons << 1;
 
     // analog sticks - skip for now
     n64_buttons << 15;
   }
-  
+
+  pinMode(3, OUTPUT);
+
+  interrupts();
+  set_input(N64_BUS_PIN);
+  pinMode(2, INPUT);
+  bitCount = 8;
+  dataIn = 0;
   noInterrupts();
-  pinMode(N64_BUS_PIN, INPUT);
-  
-  console_off:
-    while(!digitalRead(N64_BUS_PIN));
-    goto idle;
 
   idle:
-    while(digitalRead(N64_BUS_PIN));
+    while(gpio_get(N64_BUS_PIN));
     goto read_console_command;
 
   read_console_command:
-    bitCount = 8;
-    dataIn = 0;
     while(bitCount--) {
-      delay2us();
-      dataIn += digitalRead(N64_BUS_PIN);
-      dataIn << 1;
-      while(!digitalRead(N64_BUS_PIN));
-      while(digitalRead(N64_BUS_PIN));
+      delay1us();
+      delayHalf();
+      gpio_put(TEST_PIN, 1);
+      dataIn += gpio_get(N64_BUS_PIN);
+      dataIn = dataIn << 1;
+      gpio_put(TEST_PIN, 0);
+      while(!gpio_get(N64_BUS_PIN));
+      while(gpio_get(N64_BUS_PIN));
+      
     }
     delay2us(); // wait for stop bit
     delay1us();
@@ -118,29 +133,35 @@ void loop() {
     goto write_data;
 
   write_data:
-    pinMode(N64_BUS_PIN, OUTPUT);
+    interrupts();
+    set_output(N64_BUS_PIN);
+    pinMode(2, OUTPUT);
+    noInterrupts();
     while(bitCount--) {
-      digitalWrite(N64_BUS_PIN, LOW);
+      gpio_put(N64_BUS_PIN, 0);
       delay1us();
       if(dataOut | 0x80000000)
-        digitalWrite(N64_BUS_PIN, HIGH);
+        gpio_put(N64_BUS_PIN, 1);
       else
-        digitalWrite(N64_BUS_PIN, LOW);
+        gpio_put(N64_BUS_PIN, 0);
       delay2us();
-      digitalWrite(N64_BUS_PIN, HIGH);
+      gpio_put(N64_BUS_PIN, 1);
       delay1us();
-      dataOut << 1;
+      dataOut = dataOut << 1;
     }
     // stop bit
-    digitalWrite(N64_BUS_PIN, LOW);
+    gpio_put(N64_BUS_PIN, 0);
     delay2us();
-    digitalWrite(N64_BUS_PIN, HIGH);
+    gpio_put(N64_BUS_PIN, 1);
     delay2us();
     goto end;
 
 
   end:
-    pinMode(N64_BUS_PIN, INPUT);
+    interrupts();
+    set_input(N64_BUS_PIN);
+    pinMode(2, INPUT);
+    noInterrupts();
 
   
   interrupts();
