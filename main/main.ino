@@ -96,24 +96,30 @@ void loop() {
 
   pinMode(3, OUTPUT);
 
-  interrupts();
+  //interrupts();
   set_input(N64_BUS_PIN);
   pinMode(2, INPUT);
   bitCount = 8;
   dataIn = 0;
   noInterrupts();
 
-  idle:
-    while(gpio_get(N64_BUS_PIN));
-    goto read_console_command;
-
   read_console_command:
+    gpio_put(TEST_PIN, 1);
+    while(gpio_get(N64_BUS_PIN));
+    gpio_put(TEST_PIN, 0);
     while(bitCount--) {
-      delay1us();
-      delayHalf();
-      gpio_put(TEST_PIN, 1);
-      dataIn += gpio_get(N64_BUS_PIN);
+      if(bitCount != 7) {
+        delayHalf();
+        delay1us();
+      }
+
       dataIn = dataIn << 1;
+      if(gpio_get(N64_BUS_PIN)) {
+        gpio_put(TEST_PIN, 1);
+        dataIn++;
+      }
+
+
       gpio_put(TEST_PIN, 0);
       while(!gpio_get(N64_BUS_PIN));
       while(gpio_get(N64_BUS_PIN));
@@ -128,20 +134,22 @@ void loop() {
       dataOut = n64_buttons;
       bitCount = 32;
     } else {
+      delay2us();
       goto end;
     }
     goto write_data;
 
   write_data:
-    interrupts();
+    //interrupts();
+    //gpio_put(N64_BUS_PIN, 1);
     set_output(N64_BUS_PIN);
-    pinMode(2, OUTPUT);
-    noInterrupts();
+    //pinMode(2, OUTPUT);
+    //noInterrupts();
     while(bitCount--) {
       gpio_put(N64_BUS_PIN, 0);
       delay1us();
       if(dataOut | 0x80000000)
-        gpio_put(N64_BUS_PIN, 1);
+        gpio_put(N64_BUS_PIN, 0);
       else
         gpio_put(N64_BUS_PIN, 0);
       delay2us();
@@ -158,10 +166,7 @@ void loop() {
 
 
   end:
-    interrupts();
     set_input(N64_BUS_PIN);
-    pinMode(2, INPUT);
-    noInterrupts();
 
   
   interrupts();
