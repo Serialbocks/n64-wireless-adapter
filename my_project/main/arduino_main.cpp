@@ -22,14 +22,8 @@ int16_t yAxisMin = -300;
 int16_t yAxisMax = 300;
 
 static inline void resetController() {
-  BP32.update();
-  if (myGamepad && myGamepad->isConnected()) {
-    xAxisNeutral = myGamepad->axisX();
-    yAxisNeutral = -myGamepad->axisY();
-  } else {
-    xAxisNeutral = 0;
-    yAxisNeutral = 0;
-  }
+  xAxisNeutral = 0;
+  yAxisNeutral = 0;
 
   xAxisMin = -300;
   xAxisMax = 300;
@@ -154,6 +148,7 @@ void loop() {
         delay2us();
         gpio_set_level(DATA_READY_PIN, 0);
         delay2us();
+        esp_task_wdt_reset();
         delay2us();
         dataCount--;
         buttons <<= 1;
