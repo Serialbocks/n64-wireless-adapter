@@ -14,10 +14,33 @@
 #define DATA_PIN GPIO_NUM_21
 
 GamepadPtr myGamepad = nullptr;
+int16_t xAxisNeutral = 0;
+int16_t yAxisNeutral = 0;
+int16_t xAxisMin = -300;
+int16_t xAxisMax = 300;
+int16_t yAxisMin = -300;
+int16_t yAxisMax = 300;
+
+static inline void resetController() {
+  BP32.update();
+  if (myGamepad && myGamepad->isConnected()) {
+    xAxisNeutral = myGamepad->axisX();
+    yAxisNeutral = -myGamepad->axisY();
+  } else {
+    xAxisNeutral = 0;
+    yAxisNeutral = 0;
+  }
+
+  xAxisMin = -300;
+  xAxisMax = 300;
+  yAxisMin = -300;
+  yAxisMax = 300;
+}
 
 void onConnectedGamepad(GamepadPtr gp) {
     myGamepad = gp;
     BP32.enableNewBluetoothConnections(false);
+    resetController();
 }
 
 void onDisconnectedGamepad(GamepadPtr gp) {
@@ -33,53 +56,77 @@ static inline uint32_t get_controller_state() {
       uint8_t dpad = myGamepad->dpad();
       uint16_t buttons = myGamepad->buttons();
       int xAxis = myGamepad->axisX();
-      int yAxis = myGamepad->axisY();
+      int yAxis = -myGamepad->axisY();
 
       if(buttons & BUTTON_A)
         n64_buttons++;
-      n64_buttons = n64_buttons << 1;
+      n64_buttons <<= 1;
       if(buttons & BUTTON_B)
         n64_buttons++;
-      n64_buttons = n64_buttons << 1;
+      n64_buttons <<= 1;
       if(buttons & BUTTON_Z)
         n64_buttons++;
-      n64_buttons = n64_buttons << 1;
+      n64_buttons <<= 1;
       if(buttons & BUTTON_START)
         n64_buttons++;
-      n64_buttons = n64_buttons << 1;
+      n64_buttons <<= 1;
       if(dpad & DPAD_UP)
         n64_buttons++;
-      n64_buttons = n64_buttons << 1;
+      n64_buttons <<= 1;
       if(dpad & DPAD_DOWN)
         n64_buttons++;
-      n64_buttons = n64_buttons << 1;
+      n64_buttons <<= 1;
       if(dpad & DPAD_LEFT)
         n64_buttons++;
-      n64_buttons = n64_buttons << 1;
+      n64_buttons <<= 1;
       if(dpad & DPAD_RIGHT)
         n64_buttons++;
       n64_buttons <<= 3; // 2 unused bits
       if(buttons & BUTTON_L)
         n64_buttons++;
-      n64_buttons = n64_buttons << 1;
+      n64_buttons <<= 1;
       if(buttons & BUTTON_R)
         n64_buttons++;
-      n64_buttons = n64_buttons << 1;
+      n64_buttons <<= 1;
       if(buttons & BUTTON_C_UP)
         n64_buttons++;
-      n64_buttons = n64_buttons << 1;
+      n64_buttons <<= 1;
       if(buttons & BUTTON_C_DOWN)
         n64_buttons++;
-      n64_buttons = n64_buttons << 1;
+      n64_buttons <<= 1;
       if(buttons & BUTTON_C_LEFT)
         n64_buttons++;
-      n64_buttons = n64_buttons << 1;
+      n64_buttons <<= 1;
       if(buttons & BUTTON_C_RIGHT)
         n64_buttons++;
-      n64_buttons = n64_buttons << 1;
 
-      // analog sticks - skip for now
-      n64_buttons <<= 15;
+      // analog sticks
+      if(xAxis > xAxisMax)
+        xAxisMax = xAxis;
+      if(xAxis < xAxisMin)
+        xAxisMin = xAxis;
+      if(yAxis > yAxisMax)
+        yAxisMax = yAxis;
+      if(yAxis < yAxisMin)
+        yAxisMin = yAxis;
+
+      float n64XAxisFactor = xAxis > 0 ? ((float)xAxis / xAxisMax) : ((float)xAxis / xAxisMin);
+      int8_t n64XAxis = 0;
+      if(n64XAxisFactor > DEADZONE) {
+        n64XAxis = (int8_t)(n64XAxisFactor * 127);
+      }
+
+      float n64YAxisFactor = yAxis > 0 ? ((float)yAxis / yAxisMax) : ((float)yAxis / yAxisMin);
+      int8_t n64YAxis = 0;
+      if(n64YAxisFactor > DEADZONE) {
+        n64YAxis = (int8_t)(n64YAxisFactor * 127);
+      }
+
+      n64_buttons <<= 8;
+      n64_buttons |= n64XAxis;
+      n64_buttons <<= 8;
+      n64_buttons |= n64YAxis;
+
     }
 
     return n64_buttons;
