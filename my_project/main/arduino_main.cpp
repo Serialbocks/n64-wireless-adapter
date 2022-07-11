@@ -5,43 +5,110 @@
 
 #include <Arduino.h>
 #include <Bluepad32.h>
-#include "soc/rtc_wdt.h"
-#include "driver/adc.h"
-
-
 
 #include "mappings.h"
 
 #define N64_PIN GPIO_NUM_32
+#define DATA_REQ_PIN GPIO_NUM_23
+#define DATA_READY_PIN GPIO_NUM_22
+#define DATA_PIN GPIO_NUM_21
 
 GamepadPtr myGamepad = nullptr;
 
 void onConnectedGamepad(GamepadPtr gp) {
-  myGamepad = gp;
-  BP32.enableNewBluetoothConnections(false);
+    myGamepad = gp;
+    BP32.enableNewBluetoothConnections(false);
 }
 
 void onDisconnectedGamepad(GamepadPtr gp) {
-  myGamepad = nullptr;
-  BP32.enableNewBluetoothConnections(true);
+    myGamepad = nullptr;
+    BP32.enableNewBluetoothConnections(true);
 }
 
+static inline uint32_t get_controller_state() {
+    uint32_t n64_buttons = 0;
+
+    BP32.update();
+    if (myGamepad && myGamepad->isConnected()) {
+      uint8_t dpad = myGamepad->dpad();
+      uint16_t buttons = myGamepad->buttons();
+      int xAxis = myGamepad->axisX();
+      int yAxis = myGamepad->axisY();
+
+      if(buttons & BUTTON_A)
+        n64_buttons++;
+      n64_buttons = n64_buttons << 1;
+      if(buttons & BUTTON_B)
+        n64_buttons++;
+      n64_buttons = n64_buttons << 1;
+      if(buttons & BUTTON_Z)
+        n64_buttons++;
+      n64_buttons = n64_buttons << 1;
+      if(buttons & BUTTON_START)
+        n64_buttons++;
+      n64_buttons = n64_buttons << 1;
+      if(dpad & DPAD_UP)
+        n64_buttons++;
+      n64_buttons = n64_buttons << 1;
+      if(dpad & DPAD_DOWN)
+        n64_buttons++;
+      n64_buttons = n64_buttons << 1;
+      if(dpad & DPAD_LEFT)
+        n64_buttons++;
+      n64_buttons = n64_buttons << 1;
+      if(dpad & DPAD_RIGHT)
+        n64_buttons++;
+      n64_buttons <<= 3; // 2 unused bits
+      if(buttons & BUTTON_L)
+        n64_buttons++;
+      n64_buttons = n64_buttons << 1;
+      if(buttons & BUTTON_R)
+        n64_buttons++;
+      n64_buttons = n64_buttons << 1;
+      if(buttons & BUTTON_C_UP)
+        n64_buttons++;
+      n64_buttons = n64_buttons << 1;
+      if(buttons & BUTTON_C_DOWN)
+        n64_buttons++;
+      n64_buttons = n64_buttons << 1;
+      if(buttons & BUTTON_C_LEFT)
+        n64_buttons++;
+      n64_buttons = n64_buttons << 1;
+      if(buttons & BUTTON_C_RIGHT)
+        n64_buttons++;
+      n64_buttons = n64_buttons << 1;
+
+      // analog sticks - skip for now
+      n64_buttons <<= 15;
+    }
+
+    return n64_buttons;
+} 
+
 void setup() {
-  BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
-  BP32.forgetBluetoothKeys();
-  gpio_set_direction(N64_PIN, GPIO_MODE_INPUT_OUTPUT);
+    BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
+    BP32.forgetBluetoothKeys();
+    gpio_set_direction(N64_PIN, GPIO_MODE_INPUT_OUTPUT);
+    gpio_set_direction(DATA_REQ_PIN, GPIO_MODE_INPUT);
+    gpio_set_direction(DATA_READY_PIN, GPIO_MODE_OUTPUT);
+    gpio_set_direction(DATA_PIN, GPIO_MODE_OUTPUT);
 }
 
 // Arduino loop function. Runs in CPU 1
 void loop() {
-    BP32.update();
-
-
-
-    gpio_set_level(N64_PIN, 1);
-    delay1us();
-    gpio_set_level(N64_PIN, 0);
-    delay1us();
+    while(!gpio_get_level(DATA_REQ_PIN));
+    uint32_t buttons = get_controller_state();
     
-
+    int dataCount = 32;
+    while(dataCount) {
+        gpio_set_level(DATA_PIN, !!(buttons & 0x80000000));
+        gpio_set_level(DATA_READY_PIN, 1);
+        delay2us();
+        delay2us();
+        gpio_set_level(DATA_READY_PIN, 0);
+        delay2us();
+        delay2us();
+        dataCount--;
+        buttons <<= 1;
+    }
 }
