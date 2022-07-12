@@ -154,7 +154,6 @@ void loop() {
         delay2us();
         gpio_set_level(DATA_READY_PIN, 0);
         delay2us();
-        esp_task_wdt_reset();
         delay2us();
         dataCount--;
         buttons <<= 1;
