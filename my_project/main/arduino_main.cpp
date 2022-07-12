@@ -109,9 +109,8 @@ static inline uint32_t get_controller_state() {
       uint8_t n64XAxis = 0;
       if(n64XAxisFactor > DEADZONE) {
         n64XAxis = (uint8_t)(n64XAxisFactor * 110);
-        if(!xAxisPositive) {
-          n64XAxis |= 0x80;
-        }
+        if(!xAxisPositive)
+          n64XAxis = 0x80 - n64XAxis;
           
       }
 
@@ -121,7 +120,7 @@ static inline uint32_t get_controller_state() {
       if(n64YAxisFactor > DEADZONE) {
         n64YAxis = (uint8_t)(n64YAxisFactor * 110);
         if(!yAxisPositive)
-          n64YAxis |= 0x80;
+          n64YAxis = 0x80 - n64YAxis;
       }
 
       n64_buttons <<= 8;
