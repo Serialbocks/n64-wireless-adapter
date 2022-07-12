@@ -106,26 +106,28 @@ static inline uint32_t get_controller_state() {
 
       bool xAxisPositive = xAxis > 0;
       float n64XAxisFactor =xAxisPositive ? ((float)xAxis / xAxisMax) : ((float)xAxis / xAxisMin);
-      int8_t n64XAxis = 0;
+      uint8_t n64XAxis = 0;
       if(n64XAxisFactor > DEADZONE) {
-        n64XAxis = (int8_t)(n64XAxisFactor * 127);
-        if(!xAxisPositive)
-          n64XAxis *= -1;
+        n64XAxis = (uint8_t)(n64XAxisFactor * 110);
+        if(!xAxisPositive) {
+          n64XAxis |= 0x80;
+        }
+          
       }
 
       bool yAxisPositive = yAxis > 0;
       float n64YAxisFactor = yAxisPositive ? ((float)yAxis / yAxisMax) : ((float)yAxis / yAxisMin);
-      int8_t n64YAxis = 0;
+      uint8_t n64YAxis = 0;
       if(n64YAxisFactor > DEADZONE) {
-        n64YAxis = (int8_t)(n64YAxisFactor * 127);
+        n64YAxis = (uint8_t)(n64YAxisFactor * 110);
         if(!yAxisPositive)
-          n64YAxis *= -1;
+          n64YAxis |= 0x80;
       }
 
       n64_buttons <<= 8;
-      n64_buttons |= n64XAxis;
+      n64_buttons += n64XAxis;
       n64_buttons <<= 8;
-      n64_buttons |= n64YAxis;
+      n64_buttons += n64YAxis;
 
     }
 

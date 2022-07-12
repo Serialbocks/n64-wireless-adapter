@@ -9,10 +9,12 @@
 #define PIN5_MASK 0b00100000
 #define PIN6_MASK 0b01000000
 
-#define N64_PIN PIN2_MASK
+#define N64_PIN PIN6_MASK
 #define DATA_PIN PIN3_MASK
 #define DATA_READY_PIN PIN4_MASK
 #define DATA_REQ_PIN PIN5_MASK
+
+#define CONTROLLER_ID 0x0502
 
 // MACROS
 #define gpio_read(PIN) ( !!( PIND & PIN ) ) // 1 cycle
@@ -24,7 +26,7 @@
 #define delayHalf() asm("nop\nnop\nnop\n");
 #define delay2() delay1() delay1();
 
-
+uint32_t buttons = 0;
 
 void setup() {
   // Set TCNT1 to use system clock with no divide
@@ -35,8 +37,7 @@ void setup() {
   asm("cli\n");
 
   // N64 pin init
-  gpio_set_output(N64_PIN);
-  gpio_write(N64_PIN, 1);
+  gpio_set_input(N64_PIN);
 
   // Data pins init
   gpio_set_output(DATA_REQ_PIN);
@@ -48,8 +49,57 @@ void setup() {
 }
 
 void loop() {
-  uint32_t buttons = 0;
-  uint8_t bitCount = 32;
+  uint8_t bitCount = 8;
+  uint8_t dataIn = 0;
+  while(!gpio_read(N64_PIN)); // Console off
+  while(gpio_read(N64_PIN)); // Idle
+
+  read_console_command:
+    dataIn <<= 1;
+    delay1();
+    buttons += gpio_read(N64_PIN);
+    bitCount--;
+    while(!gpio_read(N64_PIN));
+    while(gpio_read(N64_PIN));
+
+    if(bitCount)
+      goto read_console_command;
+
+    if(dataIn == 0xff || dataIn == 0x01) {
+      bitCount = 16;
+      buttons = CONTROLLER_ID;
+    } else {
+      bitCount = 32;
+    }
+
+  gpio_set_output(N64_PIN);
+  gpio_write(N64_PIN, 1);
+  delay2();
+  delay2();
+  delay2();
+  
+  sendBits:
+    gpio_write(N64_PIN, 0);
+    delayHalf();
+    gpio_write(N64_PIN, buttons & 0x80000000);
+    delay2();
+    gpio_write(N64_PIN, 1);
+    //delay1();
+    bitCount--;
+    buttons <<= 1;
+    if(bitCount)
+      goto sendBits;
+
+  gpio_write(N64_PIN, 0);
+  delay2();
+  gpio_write(N64_PIN, 1);
+  delay1();
+
+  gpio_set_input(N64_PIN);
+
+  // Request and read data from esp32
+  buttons = 0;
+  bitCount = 32;
   gpio_write(DATA_REQ_PIN, 1);
   while(bitCount) {
     while(!gpio_read(DATA_READY_PIN));
@@ -62,17 +112,7 @@ void loop() {
 
   
   bitCount = 32;
-  sendBits:
-    gpio_write(N64_PIN, 0);
-    delay1();
-    gpio_write(N64_PIN, !!(buttons & 0x80000000));
-    delay2();
-    gpio_write(N64_PIN, 1);
-    delay1();
-    bitCount--;
-    buttons <<= 1;
-    if(bitCount)
-      goto sendBits;
+
 
 
 }
