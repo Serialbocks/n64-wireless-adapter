@@ -42,30 +42,9 @@ void onConnectedGamepad(GamepadPtr gp) {
       gamepad->b32Gamepad = gp;
       resetController(gamepad);
       connectedGamepads++;
-
-      //uint8_t ledMask = 0;
-      //switch(connectedGamepads) {
-      //  case 1:
-      //    ledMask = 0x01;
-      //    break;
-      //  case 2:
-      //    ledMask = 0x03;
-      //    break;
-      //  case 3:
-      //    ledMask = 0x07;
-      //    break;
-      //  case 4:
-      //    ledMask = 0x0f;
-      //    break;
-      //  default:
-      //    ledMask = 0x09;
-      //    break;
-      //}
-//
-      //gp->setPlayerLEDs(ledMask);
     }
 
-    //if(connectedGamepads >= MAX_GAMEPADS)
+    if(connectedGamepads >= MAX_GAMEPADS)
     {
       BP32.enableNewBluetoothConnections(false);
     }
