@@ -6,12 +6,13 @@
 #include <Arduino.h>
 #include <Bluepad32.h>
 
+#include "driver/uart.h"
 #include "mappings.h"
 
 #define DATA_REQ_PIN GPIO_NUM_23
 #define DATA_READY_PIN GPIO_NUM_22
 #define DATA_PIN GPIO_NUM_21
-#define MAX_GAMEPADS 2
+#define MAX_GAMEPADS 1
 
 typedef struct gamepad_t {
   GamepadPtr b32Gamepad = nullptr;
@@ -25,6 +26,8 @@ typedef struct gamepad_t {
 
 uint8_t connectedGamepads = 0;
 gamepad gamepads[MAX_GAMEPADS];
+const uart_port_t uart_num = UART_NUM_0;
+uint8_t test_data[2] = { 0x08, 0x08 };
 
 static inline void resetController(gamepad* gp) {
   gp->xAxisNeutral = 0;
@@ -44,7 +47,7 @@ void onConnectedGamepad(GamepadPtr gp) {
       connectedGamepads++;
     }
 
-    //if(connectedGamepads >= MAX_GAMEPADS)
+    if(connectedGamepads >= MAX_GAMEPADS)
     {
       BP32.enableNewBluetoothConnections(false);
     }
@@ -154,41 +157,41 @@ static inline uint32_t get_controller_state(gamepad* gp) {
     return n64_buttons;
 } 
 
+static inline void setup_uart() {
+
+    uart_config_t uart_config = {
+        .baud_rate = 250000,
+        .data_bits = UART_DATA_8_BITS,
+        .parity = UART_PARITY_DISABLE,
+        .stop_bits = UART_STOP_BITS_1,
+        .flow_ctrl = UART_HW_FLOWCTRL_CTS_RTS,
+        .rx_flow_ctrl_thresh = 122,
+    };
+    // Configure UART parameters
+    ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
+
+    const int uart_buffer_size = (1024 * 2);
+    QueueHandle_t uart_queue;
+    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, uart_buffer_size, \
+                                        uart_buffer_size, 10, &uart_queue, 0));
+}
+
 void setup() {
     BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
     BP32.forgetBluetoothKeys();
-    gpio_set_direction(DATA_REQ_PIN, GPIO_MODE_INPUT);
-    gpio_set_direction(DATA_READY_PIN, GPIO_MODE_OUTPUT);
-    gpio_set_direction(DATA_PIN, GPIO_MODE_OUTPUT);
+    setup_uart();
 }
 
 // Arduino loop function. Runs in CPU 1
 void loop() {
-    while(!gpio_get_level(DATA_REQ_PIN)) {
-      
-    }
     BP32.update();
     uint32_t buttonArr[MAX_GAMEPADS] = {0};
 
     for(int i = 0; i < connectedGamepads; i++) {
       buttonArr[i] = get_controller_state(&(gamepads[i]));
     }
-    
-    for(int i = 0; i < MAX_GAMEPADS; i++) {
-          int dataCount = 32;
-          uint32_t buttons = buttonArr[i];
-          while(dataCount) {
-              gpio_set_level(DATA_PIN, !!(buttons & 0x80000000));
-              gpio_set_level(DATA_READY_PIN, 1);
-              delay2us();
-              delay2us();
-              gpio_set_level(DATA_READY_PIN, 0);
-              delay2us();
-              delay2us();
-              dataCount--;
-              buttons <<= 1;
-          }
-    }
-    BP32.update();
 
+    uart_write_bytes(uart_num, (const char*)test_data, 2);
+
+    delay(2);
 }
