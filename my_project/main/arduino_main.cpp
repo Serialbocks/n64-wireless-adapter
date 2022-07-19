@@ -11,7 +11,7 @@
 #define DATA_REQ_PIN GPIO_NUM_23
 #define DATA_READY_PIN GPIO_NUM_22
 #define DATA_PIN GPIO_NUM_21
-#define MAX_GAMEPADS 1
+#define MAX_GAMEPADS 2
 
 typedef struct gamepad_t {
   GamepadPtr b32Gamepad = nullptr;
@@ -44,7 +44,7 @@ void onConnectedGamepad(GamepadPtr gp) {
       connectedGamepads++;
     }
 
-    if(connectedGamepads >= MAX_GAMEPADS)
+    //if(connectedGamepads >= MAX_GAMEPADS)
     {
       BP32.enableNewBluetoothConnections(false);
     }
