@@ -11,7 +11,7 @@
 #define DATA_REQ_PIN GPIO_NUM_23
 #define DATA_READY_PIN GPIO_NUM_22
 #define DATA_PIN GPIO_NUM_21
-#define MAX_GAMEPADS 4
+#define MAX_GAMEPADS 1
 
 typedef struct gamepad_t {
   GamepadPtr b32Gamepad = nullptr;
@@ -24,7 +24,7 @@ typedef struct gamepad_t {
 } gamepad;
 
 uint8_t connectedGamepads = 0;
-gamepad gamepads[MAX_GAMEPADS] = {};
+gamepad gamepads[MAX_GAMEPADS];
 
 static inline void resetController(gamepad* gp) {
   gp->xAxisNeutral = 0;
@@ -43,29 +43,30 @@ void onConnectedGamepad(GamepadPtr gp) {
       resetController(gamepad);
       connectedGamepads++;
 
-      uint8_t ledMask = 0;
-      switch(connectedGamepads) {
-        case 1:
-          ledMask = 0x01;
-          break;
-        case 2:
-          ledMask = 0x03;
-          break;
-        case 3:
-          ledMask = 0x07;
-          break;
-        case 4:
-          ledMask = 0x0f;
-          break;
-        default:
-          ledMask = 0x09;
-          break;
-      }
-
-      gp->setPlayerLEDs(ledMask);
+      //uint8_t ledMask = 0;
+      //switch(connectedGamepads) {
+      //  case 1:
+      //    ledMask = 0x01;
+      //    break;
+      //  case 2:
+      //    ledMask = 0x03;
+      //    break;
+      //  case 3:
+      //    ledMask = 0x07;
+      //    break;
+      //  case 4:
+      //    ledMask = 0x0f;
+      //    break;
+      //  default:
+      //    ledMask = 0x09;
+      //    break;
+      //}
+//
+      //gp->setPlayerLEDs(ledMask);
     }
 
-    if(connectedGamepads >= MAX_GAMEPADS) {
+    //if(connectedGamepads >= MAX_GAMEPADS)
+    {
       BP32.enableNewBluetoothConnections(false);
     }
 
@@ -81,7 +82,6 @@ static inline uint32_t get_controller_state(gamepad* gp) {
     uint32_t n64_buttons = 0;
     GamepadPtr myGamepad = gp->b32Gamepad;
 
-    BP32.update();
     if (myGamepad && myGamepad->isConnected()) {
       uint8_t dpad = myGamepad->dpad();
       uint16_t buttons = myGamepad->buttons();
@@ -185,8 +185,11 @@ void setup() {
 
 // Arduino loop function. Runs in CPU 1
 void loop() {
-    while(!gpio_get_level(DATA_REQ_PIN));
-    uint32_t buttonArr[MAX_GAMEPADS] = {};
+    while(!gpio_get_level(DATA_REQ_PIN)) {
+      
+    }
+    BP32.update();
+    uint32_t buttonArr[MAX_GAMEPADS] = {0};
 
     for(int i = 0; i < connectedGamepads; i++) {
       buttonArr[i] = get_controller_state(&(gamepads[i]));
@@ -207,5 +210,6 @@ void loop() {
               buttons <<= 1;
           }
     }
+    BP32.update();
 
 }

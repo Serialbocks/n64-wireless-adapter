@@ -21,12 +21,12 @@
 #define N64_CONT_4_DATA PIN6_MASK
 #define N64_CONT_4_ACTIVE PIN7_MASK
 
-#define DATA_PIN PIN2_MASK
-#define DATA_READY_PIN PIN3_MASK
+#define DATA_PIN PIN6_MASK
+#define DATA_READY_PIN PIN5_MASK
 #define DATA_REQ_PIN PIN4_MASK
 
 #define CONTROLLER_ID 0x0502
-#define MAX_GAMEPADS 4
+#define MAX_GAMEPADS 1
 
 // MACROS
 #define gpio_b_read(PIN) ( !!( PINB & PIN ) ) // 1 cycle
@@ -36,7 +36,7 @@
 
 #define gpio_c_read(PIN) ( !!( PINC & PIN ) ) // 1 cycle
 #define gpio_c_write(PIN, val) ( (val) ? PORTC |= PIN : PORTC &= ~PIN )
-#define gpio_c_set_input(PIN) DDRC &= ~PIN; PORTC |= PIN;
+#define gpio_c_set_input(PIN) DDRC &= ~PIN;
 #define gpio_c_set_output(PIN) DDRC |= PIN; PORTC |= PIN;
 
 #define gpio_d_read(PIN) ( !!( PIND & PIN ) ) // 1 cycle
@@ -50,6 +50,7 @@
 #define delay2() delay1() delay1();
 
 uint32_t buttonArr[MAX_GAMEPADS] = {};
+uint32_t buttons = 0;
 
 void setup() {
   // Set TCNT1 to use system clock with no divide
@@ -77,12 +78,34 @@ void setup() {
 
 }
 
+static void getButtonData() {
+    // Request and read data from esp32
+  for(int i = 0; i < MAX_GAMEPADS; i++) {
+    uint32_t buttons = 0;
+    int bitCount = 32;
+    gpio_d_write(DATA_REQ_PIN, 1);
+    while(bitCount) {
+      uint32_t count = 0;
+      while(!gpio_d_read(DATA_READY_PIN) && count++ < 5000);
+      buttons <<= 1;
+      buttons += gpio_d_read(DATA_PIN);
+      gpio_d_write(DATA_REQ_PIN, 0);
+
+      if(count >= 5000) return;
+      while(gpio_d_read(DATA_READY_PIN));
+      bitCount--;
+    }
+    buttonArr[i] = buttons;
+  }
+}
+
 void loop() {
   uint8_t n64DataPin = 0;
   uint8_t n64ActivePin = 0;
   uint8_t bitCount = 8;
   uint8_t dataIn = 0;
-  uint32_t buttons = 0;
+
+  
   for(int i = MAX_GAMEPADS - 1; i >= 0; i--) {
     switch(i) {
       case 0:
@@ -129,6 +152,7 @@ void loop() {
       bitCount = 16;
       buttons = CONTROLLER_ID;
     } else {
+      getButtonData();
       bitCount = 32;
       buttons = buttonArr[i];
     }
@@ -156,25 +180,7 @@ void loop() {
     delay1();
   
     gpio_c_set_input(n64DataPin);
-  }
-
-  // Request and read data from esp32
-  for(int i = 0; i < MAX_GAMEPADS; i++) {
-    buttons = 0;
-    bitCount = 32;
-    gpio_d_write(DATA_REQ_PIN, 1);
-    while(bitCount) {
-      uint32_t count = 0;
-      while(!gpio_d_read(DATA_READY_PIN) && count++ < 5000);
-      buttons <<= 1;
-      buttons += gpio_d_read(DATA_PIN);
-      gpio_d_write(DATA_REQ_PIN, 0);
-
-      if(count >= 5000) return;
-      while(gpio_d_read(DATA_READY_PIN));
-      bitCount--;
-    }
-    buttonArr[i] = buttons;
+    
   }
 
   
