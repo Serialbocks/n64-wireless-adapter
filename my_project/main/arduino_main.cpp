@@ -165,7 +165,7 @@ static inline void setup_uart() {
 
    const uart_config_t uart_config = {
         .baud_rate = 1000000,
-        .data_bits = UART_DATA_8_BITS,
+        .data_bits = UART_DATA_7_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
@@ -208,7 +208,7 @@ void loop() {
       gpio_set_level(TEST_PIN, 0);
 
       uart_write_bytes(uart_num, (const char*)test_data, 2);
-      delayMicroseconds(20);
+      uart_wait_tx_done(uart_num, 10000);
 
       uart_flush(uart_num);
       //Console.printf("Data: 0x%02x 0x%02x 0x%02x\n",
