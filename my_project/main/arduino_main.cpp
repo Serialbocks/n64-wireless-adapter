@@ -26,7 +26,11 @@ typedef struct gamepad_t {
 
 uint8_t connectedGamepads = 0;
 gamepad gamepads[MAX_GAMEPADS];
-const uart_port_t uart_num = UART_NUM_0;
+
+const uart_port_t uart_num = UART_NUM_1;
+#define TXD_PIN (GPIO_NUM_17)
+#define RXD_PIN (GPIO_NUM_16)
+static const int RX_BUF_SIZE = 1024;
 uint8_t test_data[2] = { 0x08, 0x08 };
 
 static inline void resetController(gamepad* gp) {
@@ -159,21 +163,19 @@ static inline uint32_t get_controller_state(gamepad* gp) {
 
 static inline void setup_uart() {
 
-    uart_config_t uart_config = {
-        .baud_rate = 250000,
+   const uart_config_t uart_config = {
+        .baud_rate = 1000000,
         .data_bits = UART_DATA_8_BITS,
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
-        .flow_ctrl = UART_HW_FLOWCTRL_CTS_RTS,
-        .rx_flow_ctrl_thresh = 122,
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
+        .source_clk = UART_SCLK_REF_TICK,
     };
-    // Configure UART parameters
-    ESP_ERROR_CHECK(uart_param_config(uart_num, &uart_config));
 
-    const int uart_buffer_size = (1024 * 2);
-    QueueHandle_t uart_queue;
-    ESP_ERROR_CHECK(uart_driver_install(UART_NUM_0, uart_buffer_size, \
-                                        uart_buffer_size, 10, &uart_queue, 0));
+    // We won't use a buffer for sending data.
+    uart_driver_install(uart_num, RX_BUF_SIZE * 2, 0, 0, NULL, 0);
+    uart_param_config(uart_num, &uart_config);
+    uart_set_pin(uart_num, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 }
 
 void setup() {
@@ -193,5 +195,5 @@ void loop() {
 
     uart_write_bytes(uart_num, (const char*)test_data, 2);
 
-    delay(2);
+    delay(10);
 }
