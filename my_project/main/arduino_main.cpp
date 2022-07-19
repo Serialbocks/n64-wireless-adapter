@@ -11,7 +11,7 @@
 
 #define DATA_REQ_PIN GPIO_NUM_23
 #define DATA_READY_PIN GPIO_NUM_22
-#define DATA_PIN GPIO_NUM_21
+#define TEST_PIN GPIO_NUM_21
 #define MAX_GAMEPADS 1
 
 typedef struct gamepad_t {
@@ -169,7 +169,7 @@ static inline void setup_uart() {
         .parity = UART_PARITY_DISABLE,
         .stop_bits = UART_STOP_BITS_1,
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE,
-        .source_clk = UART_SCLK_REF_TICK,
+        .source_clk = UART_SCLK_APB,
     };
 
     // We won't use a buffer for sending data.
@@ -182,6 +182,7 @@ void setup() {
     BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
     BP32.forgetBluetoothKeys();
     setup_uart();
+    gpio_set_direction(TEST_PIN, GPIO_MODE_OUTPUT);
 }
 
 // Arduino loop function. Runs in CPU 1
@@ -193,7 +194,31 @@ void loop() {
       buttonArr[i] = get_controller_state(&(gamepads[i]));
     }
 
-    uart_write_bytes(uart_num, (const char*)test_data, 2);
+    
+    uint8_t data[128];
+    int length = 0;
+    gpio_set_level(TEST_PIN, 1);
+    ESP_ERROR_CHECK(uart_get_buffered_data_len(uart_num, (size_t*)&length));
+    
+    if(length >= 3) {
+      //Console.printf("Length: %d\n", length);
 
-    delay(10);
+      length = uart_read_bytes(uart_num, data, length, 100);
+      uart_flush(uart_num);
+      gpio_set_level(TEST_PIN, 0);
+
+      uart_write_bytes(uart_num, (const char*)test_data, 2);
+      delayMicroseconds(20);
+
+      uart_flush(uart_num);
+      //Console.printf("Data: 0x%02x 0x%02x 0x%02x\n",
+      //  data[0], data[1], data[2]);
+    }
+
+    gpio_set_level(TEST_PIN, 0);
+
+    //uart_write_bytes(uart_num, (const char*)test_data, 2);
+    //delay2us();
+    //delay2us();
+    //uart_flush(uart_num);
 }
