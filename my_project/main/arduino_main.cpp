@@ -9,13 +9,9 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "driver/uart.h"
-#include "driver/gpio.h"
 #include "esp_log.h"
 
 static const char *TAG = "uart_events";
-#define TXD_PIN 17
-#define RXD_PIN 16
-#define TEST_PIN GPIO_NUM_21
 
 /**
  * This example shows how to use the UART driver to handle special UART events.
@@ -44,7 +40,6 @@ static void uart_event_task(void *pvParameters)
         /* Waiting for UART event.
            If it happens then print out information what is it */
         if (xQueueReceive(uart0_queue, (void * )&event, (portTickType)portMAX_DELAY)) {
-            gpio_set_level(TEST_PIN, 1);
             ESP_LOGI(TAG, "uart[%d] event:", EX_UART_NUM);
             switch (event.type) {
             case UART_DATA:
@@ -85,7 +80,6 @@ static void uart_event_task(void *pvParameters)
                 ESP_LOGE(TAG, "not serviced uart event type: %d\n", event.type);
                 break;
             }
-            gpio_set_level(TEST_PIN, 0);
         }
     }
     free(dtmp);
@@ -113,13 +107,11 @@ void loop()
     };
     uart_param_config(EX_UART_NUM, &uart_config);
     // Set UART pins using UART0 default pins i.e. no changes
-    uart_set_pin(EX_UART_NUM, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+    uart_set_pin(EX_UART_NUM, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
     uart_driver_install(EX_UART_NUM, BUF_SIZE * 2, BUF_SIZE * 2, 10, &uart0_queue, 0);
 
     // Set uart pattern detection function
-    uart_enable_pattern_det_intr(EX_UART_NUM, (char)0x74, 3, 1000000, 10, 10);
-
-    gpio_set_direction(TEST_PIN, GPIO_MODE_OUTPUT);
+    //uart_enable_pattern_det_intr(EX_UART_NUM, '+', 3, 10000, 10, 10);
 
     // Create a task to handle uart event from ISR
     xTaskCreate(uart_event_task, "uart_event_task", 2048, NULL, 12, NULL);
@@ -130,7 +122,7 @@ void loop()
         int len = uart_read_bytes(EX_UART_NUM, data, BUF_SIZE, 100 / portTICK_RATE_MS);
         if (len > 0) {
             ESP_LOGI(TAG, "uart read : %d", len);
-            //uart_write_bytes(EX_UART_NUM, (const char *)data, len);
+            uart_write_bytes(EX_UART_NUM, (const char *)data, len);
         }
     }
 }
