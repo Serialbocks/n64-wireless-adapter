@@ -28,7 +28,7 @@ typedef struct gamepad_t {
 uint8_t connectedGamepads = 0;
 gamepad gamepads[MAX_GAMEPADS];
 
-const uart_port_t uart_num = UART_NUM_1;
+const uart_port_t uart_num = UART_NUM_2;
 #define TXD_PIN (GPIO_NUM_17)
 #define RXD_PIN (GPIO_NUM_16)
 static const int RX_BUF_SIZE = 1024;
