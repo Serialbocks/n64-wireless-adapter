@@ -15,6 +15,9 @@
 #define TEST_PIN GPIO_NUM_21
 #define MAX_GAMEPADS 1
 
+#define TXD_PIN GPIO_NUM_17
+#define RXD_PIN GPIO_NUM_16
+
 typedef struct gamepad_t {
   GamepadPtr b32Gamepad = nullptr;
   int16_t xAxisNeutral = 0;
@@ -29,8 +32,7 @@ uint8_t connectedGamepads = 0;
 gamepad gamepads[MAX_GAMEPADS];
 
 const uart_port_t uart_num = UART_NUM_2;
-#define TXD_PIN (GPIO_NUM_17)
-#define RXD_PIN (GPIO_NUM_16)
+
 static const int RX_BUF_SIZE = 1024;
 uint8_t test_data[17] = { 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 
 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xfe
@@ -166,24 +168,6 @@ static inline uint32_t get_controller_state(gamepad* gp) {
     return n64_buttons;
 } 
 
-/*
- * Define UART interrupt subroutine to ackowledge interrupt
- */
-static void IRAM_ATTR uart_intr_handle(void *arg)
-{
-    gpio_set_level(TEST_PIN, 1);
-
-    int length = 0;
-    ESP_ERROR_CHECK(uart_get_buffered_data_len(uart_num, (size_t*)&length));
-
-    uart_read_bytes(uart_num, data, length, 100);
-
-    uart_write_bytes(uart_num, (const char*)test_data, 2);
-    uart_wait_tx_done(uart_num, 10000);
-    uart_flush(uart_num);
-
-    gpio_set_level(TEST_PIN, 0);
-}
 
 static inline void setup_uart() {
 
@@ -200,19 +184,6 @@ static inline void setup_uart() {
     uart_driver_install(uart_num, RX_BUF_SIZE * 2, 0, 0, NULL, 0);
     uart_param_config(uart_num, &uart_config);
     uart_set_pin(uart_num, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
-
-	  // release the pre registered UART handler/subroutine
-	  ESP_ERROR_CHECK(uart_isr_free(uart_num));
-
-	  // register new UART subroutine
-	  ESP_ERROR_CHECK(uart_isr_register(uart_num,
-      uart_intr_handle,
-      NULL,
-      ESP_INTR_FLAG_IRAM,
-      &handle_console));
-
-	  // enable RX interrupt
-	  ESP_ERROR_CHECK(uart_enable_rx_intr(uart_num));
 }
 
 void setup() {
@@ -224,10 +195,13 @@ void setup() {
 
 // Arduino loop function. Runs in CPU 1
 void loop() {
-    BP32.update();
-    uint32_t buttonArr[MAX_GAMEPADS] = {0};
+    //BP32.update();
+    //uint32_t buttonArr[MAX_GAMEPADS] = {0};
+//
+    //for(int i = 0; i < connectedGamepads; i++) {
+    //  buttonArr[i] = get_controller_state(&(gamepads[i]));
+    //}
 
-    for(int i = 0; i < connectedGamepads; i++) {
-      buttonArr[i] = get_controller_state(&(gamepads[i]));
-    }
+    gpio_set_level(TEST_PIN, gpio_get_level(RXD_PIN));
+
 }
