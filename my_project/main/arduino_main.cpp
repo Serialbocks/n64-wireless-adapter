@@ -7,16 +7,21 @@
 #include <Bluepad32.h>
 
 #include "driver/uart.h"
+#include "driver/gpio.h"
+#include "freertos/FreeRTOS.h"
+#include "freertos/task.h"
+#include "freertos/queue.h"
 #include "mappings.h"
 
 
-#define DATA_REQ_PIN GPIO_NUM_23
-#define DATA_READY_PIN GPIO_NUM_22
 #define TEST_PIN GPIO_NUM_21
 #define MAX_GAMEPADS 1
 
 #define TXD_PIN GPIO_NUM_17
 #define RXD_PIN GPIO_NUM_16
+
+#define GPIO_INTERRUPT_INPUT GPIO_NUM_22
+#define GPIO_INPUT_PIN_SEL  (1ULL<<GPIO_INTERRUPT_INPUT)
 
 typedef struct gamepad_t {
   GamepadPtr b32Gamepad = nullptr;
@@ -32,13 +37,30 @@ uint8_t connectedGamepads = 0;
 gamepad gamepads[MAX_GAMEPADS];
 
 const uart_port_t uart_num = UART_NUM_2;
-
 static const int RX_BUF_SIZE = 1024;
-uint8_t test_data[17] = { 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 
-0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xfe
-};
+uint8_t test_data[17] = { 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xfe };
 uint8_t data[125];
-static intr_handle_t handle_console;
+
+
+#define ESP_INTR_FLAG_DEFAULT 0
+static QueueHandle_t gpio_evt_queue = NULL;
+
+static void IRAM_ATTR gpio_isr_handler(void* arg)
+{
+    uint32_t gpio_num = (uint32_t) arg;
+    xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
+}
+
+static void gpio_task_example(void* arg)
+{
+    uint32_t io_num;
+    for(;;) {
+        if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
+            gpio_set_level(TEST_PIN, 1);
+            gpio_set_level(TEST_PIN, 0);
+        }
+    }
+}
 
 static inline void resetController(gamepad* gp) {
   gp->xAxisNeutral = 0;
@@ -186,8 +208,30 @@ static inline void setup_uart() {
     uart_set_pin(uart_num, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 }
 
-static void check_input_task(void *pvParameters) {
-    gpio_set_level(TEST_PIN, gpio_get_level(RXD_PIN));
+static inline void setup_gpio_interrupt() {
+    gpio_config_t io_conf;
+    //interrupt of falling edge
+    io_conf.intr_type = GPIO_INTR_NEGEDGE;
+    //bit mask of the pins, use GPIO4/5 here
+    io_conf.pin_bit_mask = GPIO_INPUT_PIN_SEL;
+    //set as input mode
+    io_conf.mode = GPIO_MODE_INPUT;
+    //enable pull-up mode
+    io_conf.pull_up_en = (gpio_pullup_t)1;
+    gpio_config(&io_conf);
+
+    //change gpio interrupt type for one pin
+    gpio_set_intr_type(GPIO_INTERRUPT_INPUT, GPIO_INTR_ANYEDGE);
+
+    //create a queue to handle gpio event from isr
+    gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
+    //start gpio task
+    xTaskCreate(gpio_task_example, "gpio_task_example", 2048, NULL, 10, NULL);
+
+    //install gpio isr service
+    gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
+    //hook isr handler for specific gpio pin
+    gpio_isr_handler_add(GPIO_INTERRUPT_INPUT, gpio_isr_handler, (void*)GPIO_INTERRUPT_INPUT);
 }
 
 void setup() {
@@ -195,7 +239,7 @@ void setup() {
     BP32.forgetBluetoothKeys();
     gpio_set_direction(TEST_PIN, GPIO_MODE_OUTPUT);
     setup_uart();
-    xTaskCreate(check_input_task, "check_input_task", 2048, NULL, 12, NULL);
+    setup_gpio_interrupt();
 }
 
 
@@ -208,8 +252,5 @@ void loop() {
     //  buttonArr[i] = get_controller_state(&(gamepads[i]));
     //}
 
-    vTaskDelay(1000);
-
-
-
+  vTaskDelay(1000);
 }
