@@ -9,6 +9,7 @@
 #include "driver/uart.h"
 #include "mappings.h"
 
+
 #define DATA_REQ_PIN GPIO_NUM_23
 #define DATA_READY_PIN GPIO_NUM_22
 #define TEST_PIN GPIO_NUM_21
@@ -178,6 +179,13 @@ static inline void setup_uart() {
     uart_driver_install(uart_num, RX_BUF_SIZE * 2, 0, 0, NULL, 0);
     uart_param_config(uart_num, &uart_config);
     uart_set_pin(uart_num, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
+
+    uart_intr_config_t uart_intr = 
+    {
+      .rxfifo_full_thresh = 3
+    };
+    uart_intr_config(uart_num, &uart_intr);
+    uart_enable_rx_intr(uart_num);
 }
 
 void setup() {
@@ -185,42 +193,39 @@ void setup() {
     BP32.forgetBluetoothKeys();
     setup_uart();
     gpio_set_direction(TEST_PIN, GPIO_MODE_OUTPUT);
+
 }
 
+uint8_t data[125];
 // Arduino loop function. Runs in CPU 1
-uint8_t data[128];
 void loop() {
-    //BP32.update();
-    //uint32_t buttonArr[MAX_GAMEPADS] = {0};
-//
-    //for(int i = 0; i < connectedGamepads; i++) {
-    //  buttonArr[i] = get_controller_state(&(gamepads[i]));
-    //}
+    BP32.update();
+    uint32_t buttonArr[MAX_GAMEPADS] = {0};
 
-    
-    poll:
+    for(int i = 0; i < connectedGamepads; i++) {
+      buttonArr[i] = get_controller_state(&(gamepads[i]));
+    }
+
     int length = 0;
     gpio_set_level(TEST_PIN, 1);
     ESP_ERROR_CHECK(uart_get_buffered_data_len(uart_num, (size_t*)&length));
-
-    if(length)
-    {
-      gpio_set_level(TEST_PIN, 0);
-      length = uart_read_bytes(uart_num, data, 3, portMAX_DELAY);
-      uart_flush(uart_num);
-
-      uart_write_bytes(uart_num, (const char*)test_data, 17);
-      uart_wait_tx_done(uart_num, 10000);
-      uart_flush(uart_num);
+    
+    if(length >= 3) {
       //Console.printf("Length: %d\n", length);
-      //Console.printf("Data: 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x 0x%02x\n",
-      //  data[0], data[1], data[2], data[3], data[4], data[5]);
+
+      length = uart_read_bytes(uart_num, data, length, 100);
+      uart_flush(uart_num);
+      gpio_set_level(TEST_PIN, 0);
+
+      uart_write_bytes(uart_num, (const char*)test_data, 2);
+      uart_wait_tx_done(uart_num, 10000);
+
+      uart_flush(uart_num);
+      //Console.printf("Data: 0x%02x 0x%02x 0x%02x\n",
+      //  data[0], data[1], data[2]);
     }
 
     gpio_set_level(TEST_PIN, 0);
-
-
-    goto poll;
 
     //uart_write_bytes(uart_num, (const char*)test_data, 2);
     //delay2us();
