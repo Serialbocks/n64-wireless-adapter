@@ -35,6 +35,8 @@ static const int RX_BUF_SIZE = 1024;
 uint8_t test_data[17] = { 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 
 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xfe
 };
+static QueueHandle_t uart2_queue;
+static const char *TAG = "uart_events";
 
 static inline void resetController(gamepad* gp) {
   gp->xAxisNeutral = 0;
@@ -164,6 +166,34 @@ static inline uint32_t get_controller_state(gamepad* gp) {
     return n64_buttons;
 } 
 
+static void uart_event_task(void *pvParameters)
+{
+    uart_event_t event;
+    size_t buffered_size;
+    uint8_t* dtmp = (uint8_t*) malloc(RX_BUF_SIZE);
+    for(;;) {
+        //Waiting for UART event.
+        if(xQueueReceive(uart2_queue, (void * )&event, (TickType_t)portMAX_DELAY)) {
+            bzero(dtmp, RX_BUF_SIZE);
+            ESP_LOGI(TAG, "uart[%d] event:", uart_num);
+            switch(event.type) {
+                case UART_DATA:
+                    ESP_LOGI(TAG, "[UART DATA]: %d", event.size);
+                    uart_read_bytes(uart_num, dtmp, event.size, portMAX_DELAY);
+                    ESP_LOGI(TAG, "[DATA EVT]:");
+                    //uart_write_bytes(EX_UART_NUM, (const char*) dtmp, event.size);
+                    break;
+                default:
+                    ESP_LOGI(TAG, "uart event type: %d", event.type);
+                    break;
+            }
+        }
+    }
+    free(dtmp);
+    dtmp = NULL;
+    vTaskDelete(NULL);
+}
+
 static inline void setup_uart() {
 
    const uart_config_t uart_config = {
@@ -176,7 +206,7 @@ static inline void setup_uart() {
     };
 
     // We won't use a buffer for sending data.
-    uart_driver_install(uart_num, RX_BUF_SIZE * 2, 0, 0, NULL, 0);
+    uart_driver_install(uart_num, RX_BUF_SIZE * 2, 0, 0, &uart2_queue, 0);
     uart_param_config(uart_num, &uart_config);
     uart_set_pin(uart_num, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 
@@ -184,8 +214,8 @@ static inline void setup_uart() {
     {
       .rxfifo_full_thresh = 3
     };
-    uart_intr_config(uart_num, &uart_intr);
-    uart_enable_rx_intr(uart_num);
+    //uart_intr_config(uart_num, &uart_intr);
+    xTaskCreate(uart_event_task, "uart_event_task", 2048, NULL, 12, NULL);
 }
 
 void setup() {
@@ -206,26 +236,26 @@ void loop() {
       buttonArr[i] = get_controller_state(&(gamepads[i]));
     }
 
-    int length = 0;
-    gpio_set_level(TEST_PIN, 1);
-    ESP_ERROR_CHECK(uart_get_buffered_data_len(uart_num, (size_t*)&length));
-    
-    if(length >= 3) {
-      //Console.printf("Length: %d\n", length);
-
-      length = uart_read_bytes(uart_num, data, length, 100);
-      uart_flush(uart_num);
-      gpio_set_level(TEST_PIN, 0);
-
-      uart_write_bytes(uart_num, (const char*)test_data, 2);
-      uart_wait_tx_done(uart_num, 10000);
-
-      uart_flush(uart_num);
-      //Console.printf("Data: 0x%02x 0x%02x 0x%02x\n",
-      //  data[0], data[1], data[2]);
-    }
-
-    gpio_set_level(TEST_PIN, 0);
+    //int length = 0;
+    //gpio_set_level(TEST_PIN, 1);
+    //ESP_ERROR_CHECK(uart_get_buffered_data_len(uart_num, (size_t*)&length));
+    //
+    //if(length >= 3) {
+    //  //Console.printf("Length: %d\n", length);
+//
+    //  length = uart_read_bytes(uart_num, data, length, 100);
+    //  uart_flush(uart_num);
+    //  gpio_set_level(TEST_PIN, 0);
+//
+    //  uart_write_bytes(uart_num, (const char*)test_data, 2);
+    //  uart_wait_tx_done(uart_num, 10000);
+//
+    //  uart_flush(uart_num);
+    //  Console.printf("Data: 0x%02x 0x%02x 0x%02x\n",
+    //    data[0], data[1], data[2]);
+    //}
+//
+    //gpio_set_level(TEST_PIN, 0);
 
     //uart_write_bytes(uart_num, (const char*)test_data, 2);
     //delay2us();
