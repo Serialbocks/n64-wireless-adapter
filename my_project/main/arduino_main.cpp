@@ -186,12 +186,18 @@ static inline void setup_uart() {
     uart_set_pin(uart_num, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 }
 
+static void check_input_task(void *pvParameters) {
+    gpio_set_level(TEST_PIN, gpio_get_level(RXD_PIN));
+}
+
 void setup() {
     BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
     BP32.forgetBluetoothKeys();
     gpio_set_direction(TEST_PIN, GPIO_MODE_OUTPUT);
     setup_uart();
+    xTaskCreate(check_input_task, "check_input_task", 2048, NULL, 12, NULL);
 }
+
 
 // Arduino loop function. Runs in CPU 1
 void loop() {
@@ -202,6 +208,8 @@ void loop() {
     //  buttonArr[i] = get_controller_state(&(gamepads[i]));
     //}
 
-    gpio_set_level(TEST_PIN, gpio_get_level(RXD_PIN));
+    vTaskDelay(1000);
+
+
 
 }
