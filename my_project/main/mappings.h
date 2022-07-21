@@ -22,7 +22,7 @@
 #define DPAD_RIGHT 0x04
 #define DPAD_DOWN 0x02
 
-#define CONTROLLER_ID 0x0502
+#define CONTROLLER_ID 0x050000
 
 #define DEADZONE 0.20f
 

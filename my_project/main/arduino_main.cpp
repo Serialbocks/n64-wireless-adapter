@@ -38,15 +38,16 @@ const uart_port_t uart_num = UART_NUM_2;
 static const int RX_BUF_SIZE = 1024;
 
 #define UART_DATA_LEN 17
-#define UART_ID_LEN 9
+#define UART_ID_LEN 13
 #define N64_UART_00 0x08
 #define N64_UART_10 0x0f
 #define N64_UART_01 0xe0
 uint8_t controller_data[UART_DATA_LEN] = { 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0xfc };
-uint8_t controller_id[UART_ID_LEN] = { 0x08, 0x08, 0xe8, 0xe8, 0x08, 0x08, 0x08, 0x0f, 0xfc };
+uint8_t controller_id[UART_ID_LEN] = { 0x08, 0x08, 0xe8, 0xe8, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0xfc };
 
 #define POLL_DATA 1
 #define POLL_ID 2
+#define POLL_DATA_TIMEOUT 80000000
 volatile uint8_t pollVal = 0;
 volatile unsigned lastPollTimestamp = 0;
 
@@ -57,8 +58,13 @@ static inline void get_controller_state(gamepad* gp);
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
     delayMicroseconds(33);
-    //lastPollTimestamp = xthal_get_ccount();
-    pollVal = 1;
+    if(xthal_get_ccount() - lastPollTimestamp > POLL_DATA_TIMEOUT) {
+      pollVal = POLL_ID;
+    } else {
+      pollVal = POLL_DATA;
+    }
+    lastPollTimestamp = xthal_get_ccount();
+
 }
 
 static inline void resetController(gamepad* gp) {
@@ -279,13 +285,16 @@ void loop() {
 
     if(pollVal) {
       disable_interrupts();
-      pollVal = 0;
-      uart_write_bytes(uart_num, (const char*)controller_data, UART_DATA_LEN);
+      if(pollVal == POLL_DATA) {
+        uart_write_bytes(uart_num, (const char*)controller_data, UART_DATA_LEN);
+      } else if(pollVal == POLL_ID) {
+        uart_write_bytes(uart_num, (const char*)controller_id, UART_ID_LEN);
+      }
+
       uart_wait_tx_done(uart_num, 10000);
       uart_flush(uart_num);
+      pollVal = 0;
       enable_interrupts();
-      Console.printf("Time since last: %u", xthal_get_ccount() - lastPollTimestamp);
-      lastPollTimestamp = xthal_get_ccount();
     }
     delayMicroseconds(1);
 }
