@@ -8,9 +8,7 @@
 
 #include "driver/uart.h"
 #include "driver/gpio.h"
-#include "freertos/FreeRTOS.h"
-#include "freertos/task.h"
-#include "freertos/queue.h"
+#include "xtensa/hal.h"
 #include "mappings.h"
 
 
@@ -40,12 +38,17 @@ const uart_port_t uart_num = UART_NUM_2;
 static const int RX_BUF_SIZE = 1024;
 
 #define UART_DATA_LEN 17
+#define UART_ID_LEN 9
 #define N64_UART_00 0x08
 #define N64_UART_10 0x0f
 #define N64_UART_01 0xe0
 uint8_t controller_data[UART_DATA_LEN] = { 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0xfc };
+uint8_t controller_id[UART_ID_LEN] = { 0x08, 0x08, 0xe8, 0xe8, 0x08, 0x08, 0x08, 0x0f, 0xfc };
 
+#define POLL_DATA 1
+#define POLL_ID 2
 volatile uint8_t pollVal = 0;
+volatile unsigned lastPollTimestamp = 0;
 
 #define ESP_INTR_FLAG_DEFAULT 0
 
@@ -54,6 +57,7 @@ static inline void get_controller_state(gamepad* gp);
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
     delayMicroseconds(33);
+    //lastPollTimestamp = xthal_get_ccount();
     pollVal = 1;
 }
 
@@ -266,11 +270,8 @@ void setup() {
 
 
 // Arduino loop function. Runs in CPU 1
-bool dataSelect = false;
 void loop() {
-    
     BP32.update();
-    uint32_t buttonArr[MAX_GAMEPADS] = {0};
 
     for(int i = 0; i < connectedGamepads; i++) {
       get_controller_state(&(gamepads[i]));
@@ -283,6 +284,8 @@ void loop() {
       uart_wait_tx_done(uart_num, 10000);
       uart_flush(uart_num);
       enable_interrupts();
+      Console.printf("Time since last: %u", xthal_get_ccount() - lastPollTimestamp);
+      lastPollTimestamp = xthal_get_ccount();
     }
     delayMicroseconds(1);
 }
