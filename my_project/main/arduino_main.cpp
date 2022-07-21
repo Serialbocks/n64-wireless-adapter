@@ -53,18 +53,8 @@ static inline void get_controller_state(gamepad* gp);
 
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
-    delay2us(); delay2us();
-    delay2us(); delay2us();
-    delay2us(); delay2us();
-    delay2us(); delay2us();
-    delay2us(); delay2us();
-    delay2us(); delay2us();
-    delay2us(); delay2us();
-    delay2us(); delay2us();
-    delay2us(); delay1us();
-    delayHalf(); asm("nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;");
-    pollVal = gpio_get_level(GPIO_INTERRUPT_INPUT);
-
+    delayMicroseconds(33);
+    pollVal = 1;
 }
 
 static inline void resetController(gamepad* gp) {
@@ -176,7 +166,7 @@ static inline void get_controller_state(gamepad* gp) {
       float n64XAxisFactor =xAxisPositive ? ((float)xAxis / gp->xAxisMax) : ((float)xAxis / gp->xAxisMin);
       uint8_t n64XAxis = 0;
       if(n64XAxisFactor > DEADZONE) {
-        n64XAxis = (uint8_t)(n64XAxisFactor * 110);
+        n64XAxis = (uint8_t)(n64XAxisFactor * 127);
         if(!xAxisPositive) {
           n64XAxis = 0x80 - n64XAxis;
           n64XAxis |= 0x80;
@@ -187,7 +177,7 @@ static inline void get_controller_state(gamepad* gp) {
       float n64YAxisFactor = yAxisPositive ? ((float)yAxis / gp->yAxisMax) : ((float)yAxis / gp->yAxisMin);
       uint8_t n64YAxis = 0;
       if(n64YAxisFactor > DEADZONE) {
-        n64YAxis = (uint8_t)(n64YAxisFactor * 110);
+        n64YAxis = (uint8_t)(n64YAxisFactor * 127);
         if(!yAxisPositive) {
           n64YAxis = 0x80 - n64YAxis;
           n64YAxis |= 0x80;
@@ -199,7 +189,7 @@ static inline void get_controller_state(gamepad* gp) {
         if(n64XAxis & 0x80) {
           controller_data[dataIndex] |= N64_UART_10;
         }
-        if(n64XAxis & 0x4) {
+        if(n64XAxis & 0x40) {
           controller_data[dataIndex] |= N64_UART_01;
         }
         n64XAxis <<= 2;
@@ -211,7 +201,7 @@ static inline void get_controller_state(gamepad* gp) {
         if(n64YAxis & 0x80) {
           controller_data[dataIndex] |= N64_UART_10;
         }
-        if(n64YAxis & 0x4) {
+        if(n64YAxis & 0x40) {
           controller_data[dataIndex] |= N64_UART_01;
         }
         n64YAxis <<= 2;
@@ -294,6 +284,5 @@ void loop() {
       uart_flush(uart_num);
       enable_interrupts();
     }
-
-    delayMicroseconds(10);
+    delayMicroseconds(1);
 }
