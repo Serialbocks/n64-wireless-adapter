@@ -38,13 +38,18 @@ gamepad gamepads[MAX_GAMEPADS];
 
 const uart_port_t uart_num = UART_NUM_2;
 static const int RX_BUF_SIZE = 1024;
-uint8_t controller_data[17] = { 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0xfc };
+
+#define UART_DATA_LEN 17
+#define N64_UART_00 0x08
+#define N64_UART_10 0x0f
+#define N64_UART_01 0xe0
+uint8_t controller_data[UART_DATA_LEN] = { 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0xfc };
 
 volatile uint8_t pollVal = 0;
 
 #define ESP_INTR_FLAG_DEFAULT 0
 
-static inline uint32_t get_controller_state(gamepad* gp);
+static inline void get_controller_state(gamepad* gp);
 
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
@@ -93,57 +98,69 @@ void onDisconnectedGamepad(GamepadPtr gp) {
     BP32.enableNewBluetoothConnections(true);
 }
 
-static inline uint32_t get_controller_state(gamepad* gp) {
-    uint32_t n64_buttons = 0;
+static inline void get_controller_state(gamepad* gp) {
     GamepadPtr myGamepad = gp->b32Gamepad;
 
     if (myGamepad && myGamepad->isConnected()) {
+      uint8_t dataIndex = 0;
       uint8_t dpad = myGamepad->dpad();
       uint16_t buttons = myGamepad->buttons();
       int xAxis = myGamepad->axisX();
       int yAxis = -myGamepad->axisY();
 
+      // Uart data hack: http://www.qwertymodo.com/hardware-projects/n64/n64-controller
+      controller_data[dataIndex] = N64_UART_00;
       if(buttons & BUTTON_A)
-        n64_buttons++;
-      n64_buttons <<= 1;
+        controller_data[dataIndex] |= N64_UART_10;
       if(buttons & BUTTON_B)
-        n64_buttons++;
-      n64_buttons <<= 1;
+        controller_data[dataIndex] |= N64_UART_01;
+      dataIndex++;
+      
+      controller_data[dataIndex] = N64_UART_00;
       if(buttons & BUTTON_Z)
-        n64_buttons++;
-      n64_buttons <<= 1;
+        controller_data[dataIndex] |= N64_UART_10;
       if(buttons & BUTTON_START)
-        n64_buttons++;
-      n64_buttons <<= 1;
+        controller_data[dataIndex] |= N64_UART_01;
+      dataIndex++;
+
+      controller_data[dataIndex] = N64_UART_00;
       if(dpad & DPAD_UP)
-        n64_buttons++;
-      n64_buttons <<= 1;
+        controller_data[dataIndex] |= N64_UART_10;
       if(dpad & DPAD_DOWN)
-        n64_buttons++;
-      n64_buttons <<= 1;
+        controller_data[dataIndex] |= N64_UART_01;
+      dataIndex++;
+      
+      controller_data[dataIndex] = N64_UART_00;
       if(dpad & DPAD_LEFT)
-        n64_buttons++;
-      n64_buttons <<= 1;
+        controller_data[dataIndex] |= N64_UART_10;
       if(dpad & DPAD_RIGHT)
-        n64_buttons++;
-      n64_buttons <<= 3; // 2 unused bits
+        controller_data[dataIndex] |= N64_UART_01;
+      dataIndex++;
+
+      // 2 unused bits
+      controller_data[dataIndex] = N64_UART_00;
+      dataIndex++;
+
+      controller_data[dataIndex] = N64_UART_00;
       if(buttons & BUTTON_L)
-        n64_buttons++;
-      n64_buttons <<= 1;
+        controller_data[dataIndex] |= N64_UART_10;
       if(buttons & BUTTON_R)
-        n64_buttons++;
-      n64_buttons <<= 1;
+        controller_data[dataIndex] |= N64_UART_01;
+      dataIndex++;
+
+      controller_data[dataIndex] = N64_UART_00;
       if(buttons & BUTTON_C_UP)
-        n64_buttons++;
-      n64_buttons <<= 1;
+        controller_data[dataIndex] |= N64_UART_10;
       if(buttons & BUTTON_C_DOWN)
-        n64_buttons++;
-      n64_buttons <<= 1;
+        controller_data[dataIndex] |= N64_UART_01;
+      dataIndex++;
+
+      controller_data[dataIndex] = N64_UART_00;
       if(buttons & BUTTON_C_LEFT)
-        n64_buttons++;
-      n64_buttons <<= 1;
+        controller_data[dataIndex] |= N64_UART_10;
       if(buttons & BUTTON_C_RIGHT)
-        n64_buttons++;
+        controller_data[dataIndex] |= N64_UART_01;
+      dataIndex++;
 
       // analog sticks
       if(xAxis > gp->xAxisMax)
@@ -164,8 +181,6 @@ static inline uint32_t get_controller_state(gamepad* gp) {
           n64XAxis = 0x80 - n64XAxis;
           n64XAxis |= 0x80;
         }
-          
-          
       }
 
       bool yAxisPositive = yAxis > 0;
@@ -177,17 +192,32 @@ static inline uint32_t get_controller_state(gamepad* gp) {
           n64YAxis = 0x80 - n64YAxis;
           n64YAxis |= 0x80;
         }
-          
+      }
+      
+      for(int i = 0; i < 4; i++) {
+        controller_data[dataIndex] = N64_UART_00;
+        if(n64XAxis & 0x80) {
+          controller_data[dataIndex] |= N64_UART_10;
+        }
+        if(n64XAxis & 0x4) {
+          controller_data[dataIndex] |= N64_UART_01;
+        }
+        n64XAxis <<= 2;
+        dataIndex++;
       }
 
-      n64_buttons <<= 8;
-      n64_buttons += n64XAxis;
-      n64_buttons <<= 8;
-      n64_buttons += n64YAxis;
-
+      for(int i = 0; i < 4; i++) {
+        controller_data[dataIndex] = N64_UART_00;
+        if(n64YAxis & 0x80) {
+          controller_data[dataIndex] |= N64_UART_10;
+        }
+        if(n64YAxis & 0x4) {
+          controller_data[dataIndex] |= N64_UART_01;
+        }
+        n64YAxis <<= 2;
+        dataIndex++;
+      }
     }
-
-    return n64_buttons;
 } 
 
 
@@ -253,14 +283,13 @@ void loop() {
     uint32_t buttonArr[MAX_GAMEPADS] = {0};
 
     for(int i = 0; i < connectedGamepads; i++) {
-      buttonArr[i] = get_controller_state(&(gamepads[i]));
+      get_controller_state(&(gamepads[i]));
     }
 
     if(pollVal) {
       disable_interrupts();
       pollVal = 0;
-      uart_write_bytes(uart_num, dataSelect ? (const char*)test_data : (const char*)test_data_2, 17);
-      dataSelect = !dataSelect;
+      uart_write_bytes(uart_num, (const char*)controller_data, UART_DATA_LEN);
       uart_wait_tx_done(uart_num, 10000);
       uart_flush(uart_num);
       enable_interrupts();
