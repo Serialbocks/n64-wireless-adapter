@@ -38,28 +38,28 @@ gamepad gamepads[MAX_GAMEPADS];
 
 const uart_port_t uart_num = UART_NUM_2;
 static const int RX_BUF_SIZE = 1024;
-uint8_t test_data[17] = { 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xef, 0xfe };
-uint8_t data[125];
+uint8_t controller_data[17] = { 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0x08, 0xfc };
 
+volatile uint8_t pollVal = 0;
 
 #define ESP_INTR_FLAG_DEFAULT 0
-static QueueHandle_t gpio_evt_queue = NULL;
+
+static inline uint32_t get_controller_state(gamepad* gp);
 
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
-    uint32_t gpio_num = (uint32_t) arg;
-    xQueueSendFromISR(gpio_evt_queue, &gpio_num, NULL);
-}
+    delay2us(); delay2us();
+    delay2us(); delay2us();
+    delay2us(); delay2us();
+    delay2us(); delay2us();
+    delay2us(); delay2us();
+    delay2us(); delay2us();
+    delay2us(); delay2us();
+    delay2us(); delay2us();
+    delay2us(); delay1us();
+    delayHalf(); asm("nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;");
+    pollVal = gpio_get_level(GPIO_INTERRUPT_INPUT);
 
-static void gpio_task_example(void* arg)
-{
-    uint32_t io_num;
-    for(;;) {
-        if(xQueueReceive(gpio_evt_queue, &io_num, portMAX_DELAY)) {
-            gpio_set_level(TEST_PIN, 1);
-            gpio_set_level(TEST_PIN, 0);
-        }
-    }
 }
 
 static inline void resetController(gamepad* gp) {
@@ -208,6 +208,14 @@ static inline void setup_uart() {
     uart_set_pin(uart_num, TXD_PIN, RXD_PIN, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE);
 }
 
+static inline void enable_interrupts() {
+    gpio_isr_handler_add(GPIO_INTERRUPT_INPUT, gpio_isr_handler, (void*)GPIO_INTERRUPT_INPUT);
+}
+
+static inline void disable_interrupts() {
+    gpio_isr_handler_remove(GPIO_INTERRUPT_INPUT);
+}
+
 static inline void setup_gpio_interrupt() {
     gpio_config_t io_conf;
     //interrupt of falling edge
@@ -223,15 +231,9 @@ static inline void setup_gpio_interrupt() {
     //change gpio interrupt type for one pin
     gpio_set_intr_type(GPIO_INTERRUPT_INPUT, GPIO_INTR_ANYEDGE);
 
-    //create a queue to handle gpio event from isr
-    gpio_evt_queue = xQueueCreate(10, sizeof(uint32_t));
-    //start gpio task
-    xTaskCreate(gpio_task_example, "gpio_task_example", 2048, NULL, 10, NULL);
-
     //install gpio isr service
     gpio_install_isr_service(ESP_INTR_FLAG_DEFAULT);
-    //hook isr handler for specific gpio pin
-    gpio_isr_handler_add(GPIO_INTERRUPT_INPUT, gpio_isr_handler, (void*)GPIO_INTERRUPT_INPUT);
+    enable_interrupts();
 }
 
 void setup() {
@@ -244,13 +246,25 @@ void setup() {
 
 
 // Arduino loop function. Runs in CPU 1
+bool dataSelect = false;
 void loop() {
-    //BP32.update();
-    //uint32_t buttonArr[MAX_GAMEPADS] = {0};
-//
-    //for(int i = 0; i < connectedGamepads; i++) {
-    //  buttonArr[i] = get_controller_state(&(gamepads[i]));
-    //}
+    
+    BP32.update();
+    uint32_t buttonArr[MAX_GAMEPADS] = {0};
 
-  vTaskDelay(1000);
+    for(int i = 0; i < connectedGamepads; i++) {
+      buttonArr[i] = get_controller_state(&(gamepads[i]));
+    }
+
+    if(pollVal) {
+      disable_interrupts();
+      pollVal = 0;
+      uart_write_bytes(uart_num, dataSelect ? (const char*)test_data : (const char*)test_data_2, 17);
+      dataSelect = !dataSelect;
+      uart_wait_tx_done(uart_num, 10000);
+      uart_flush(uart_num);
+      enable_interrupts();
+    }
+
+    delayMicroseconds(10);
 }
