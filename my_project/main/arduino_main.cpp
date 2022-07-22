@@ -59,7 +59,8 @@ static inline void get_controller_state(gamepad* gp);
 
 static void IRAM_ATTR gpio_isr_handler(void* arg)
 {
-    delayMicroseconds(33);
+    //delayMicroseconds(33);
+
     if(xthal_get_ccount() - lastPollTimestamp > POLL_DATA_TIMEOUT) {
       pollVal = POLL_ID;
     } else {
@@ -85,6 +86,7 @@ void onConnectedGamepad(GamepadPtr gp) {
       gamepad->b32Gamepad = gp;
       resetController(gamepad);
       connectedGamepads++;
+      delayMicroseconds(10);
       gp->setPlayerLEDs(PLAYER_LEDS);
     }
 
@@ -179,7 +181,7 @@ static inline void get_controller_state(gamepad* gp) {
       float n64XAxisFactor =xAxisPositive ? ((float)xAxis / gp->xAxisMax) : ((float)xAxis / gp->xAxisMin);
       uint8_t n64XAxis = 0;
       if(n64XAxisFactor > DEADZONE) {
-        n64XAxis = (uint8_t)(n64XAxisFactor * 127);
+        n64XAxis = (uint8_t)(n64XAxisFactor * 85);
         if(!xAxisPositive) {
           n64XAxis = 0x80 - n64XAxis;
           n64XAxis |= 0x80;
@@ -190,7 +192,7 @@ static inline void get_controller_state(gamepad* gp) {
       float n64YAxisFactor = yAxisPositive ? ((float)yAxis / gp->yAxisMax) : ((float)yAxis / gp->yAxisMin);
       uint8_t n64YAxis = 0;
       if(n64YAxisFactor > DEADZONE) {
-        n64YAxis = (uint8_t)(n64YAxisFactor * 127);
+        n64YAxis = (uint8_t)(n64YAxisFactor * 85);
         if(!yAxisPositive) {
           n64YAxis = 0x80 - n64YAxis;
           n64YAxis |= 0x80;
@@ -280,13 +282,8 @@ void setup() {
 
 // Arduino loop function. Runs in CPU 1
 void loop() {
-    BP32.update();
-
-    for(int i = 0; i < connectedGamepads; i++) {
-      get_controller_state(&(gamepads[i]));
-    }
-
     if(pollVal) {
+
       disable_interrupts();
       if(pollVal == POLL_DATA) {
         uart_write_bytes(uart_num, (const char*)controller_data, UART_DATA_LEN);
@@ -298,6 +295,10 @@ void loop() {
       uart_flush(uart_num);
       pollVal = 0;
       enable_interrupts();
+      BP32.update();
+      for(int i = 0; i < connectedGamepads; i++) {
+        get_controller_state(&(gamepads[i]));
+      }
     }
     delayMicroseconds(1);
 }
