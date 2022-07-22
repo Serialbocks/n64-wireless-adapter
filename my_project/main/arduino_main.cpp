@@ -21,6 +21,8 @@
 #define GPIO_INTERRUPT_INPUT GPIO_NUM_22
 #define GPIO_INPUT_PIN_SEL  (1ULL<<GPIO_INTERRUPT_INPUT)
 
+#define PLAYER_LEDS 0x03
+
 typedef struct gamepad_t {
   GamepadPtr b32Gamepad = nullptr;
   int16_t xAxisNeutral = 0;
@@ -83,6 +85,7 @@ void onConnectedGamepad(GamepadPtr gp) {
       gamepad->b32Gamepad = gp;
       resetController(gamepad);
       connectedGamepads++;
+      gp->setPlayerLEDs(PLAYER_LEDS);
     }
 
     if(connectedGamepads >= MAX_GAMEPADS)
