@@ -269,23 +269,7 @@ static inline void setup_gpio_interrupt() {
     enable_interrupts();
 }
 
-void setup() {
-    BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
-    BP32.forgetBluetoothKeys();
-    gpio_set_direction(TEST_PIN, GPIO_MODE_OUTPUT);
-    setup_uart();
-    setup_gpio_interrupt();
-}
-
-
-// Arduino loop function. Runs in CPU 1
-void loop() {
-    BP32.update();
-
-    for(int i = 0; i < connectedGamepads; i++) {
-      get_controller_state(&(gamepads[i]));
-    }
-
+static void check_poll_task(void *pvParameters) {
     if(pollVal) {
       disable_interrupts();
       if(pollVal == POLL_DATA) {
@@ -299,5 +283,25 @@ void loop() {
       pollVal = 0;
       enable_interrupts();
     }
+}
+
+void setup() {
+    BP32.setup(&onConnectedGamepad, &onDisconnectedGamepad);
+    BP32.forgetBluetoothKeys();
+    gpio_set_direction(TEST_PIN, GPIO_MODE_OUTPUT);
+    setup_uart();
+    setup_gpio_interrupt();
+    xTaskCreate(check_poll_task, "check_poll_task", 2048, NULL, 12, NULL);
+}
+
+
+// Arduino loop function. Runs in CPU 1
+void loop() {
+    BP32.update();
+
+    for(int i = 0; i < connectedGamepads; i++) {
+      get_controller_state(&(gamepads[i]));
+    }
+
     delayMicroseconds(1);
 }
