@@ -24,7 +24,7 @@
 
 #define CONTROLLER_ID 0x050000
 
-#define DEADZONE 0.20f
+#define DEADZONE 0.10f
 
 #define delayHalf() asm("nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;nop;");
 #define delay1us() delayHalf() delayHalf()
